@@ -702,3 +702,66 @@ nav a.active {
     flex-direction: column;
   }
 }
+/* VOICE INTERACTION */
+
+.voice-active {
+  animation: pulseVoice 1.2s infinite;
+}
+
+.voice-state-title {
+  font-size: 14px;
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.voice-query {
+  margin: 18px auto 0;
+  padding: 12px 15px;
+  max-width: 280px;
+  background: #151d26;
+  border: 1px solid #263342;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.processing-bar {
+  width: 230px;
+  height: 4px;
+  background: #26313c;
+  border-radius: 5px;
+  margin: 20px auto 0;
+  overflow: hidden;
+}
+
+.processing-bar div {
+  width: 45%;
+  height: 100%;
+  background: #e2e8f0;
+  animation: processing 1.2s infinite;
+}
+
+@keyframes pulseVoice {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes processing {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
+}

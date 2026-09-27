@@ -1,31 +1,47 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  getIncidents,
+  investigateIncident,
+  confirmRemediation,
+} from "./api";
 
 function App() {
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const incidents = [
-    {
-      id: 1,
-      title: "HTTP 500 Spike",
-      service: "production-api",
-      severity: "HIGH",
-      time: "Detected 4 minutes ago",
-    },
-    {
-      id: 2,
-      title: "Database Latency",
-      service: "user-service",
-      severity: "MEDIUM",
-      time: "Detected 11 minutes ago",
-    },
-    {
-      id: 3,
-      title: "Memory Usage Warning",
-      service: "worker-service",
-      severity: "LOW",
-      time: "Detected 18 minutes ago",
-    },
-  ];
+  const [voiceState, setVoiceState] = useState("idle");
+
+  useEffect(() => {
+    loadIncidents();
+  }, []);
+
+  async function loadIncidents() {
+    const data = await getIncidents();
+
+    setIncidents(data);
+    setLoading(false);
+  }
+
+  const startVoiceSession = () => {
+    setVoiceState("listening");
+
+    setTimeout(() => {
+      setVoiceState("processing");
+    }, 2000);
+
+    setTimeout(() => {
+      setVoiceState("result");
+    }, 4000);
+  };
+
+  const openVoiceIncident = () => {
+    if (incidents.length > 0) {
+      setSelectedIncident(incidents[0]);
+    }
+
+    setVoiceState("idle");
+  };
 
   if (selectedIncident) {
     return (
@@ -79,8 +95,8 @@ function App() {
         <section className="stats">
           <div className="stat-card">
             <span>Active Incidents</span>
-            <strong>3</strong>
-            <small>2 high priority</small>
+            <strong>{incidents.length}</strong>
+            <small>Currently being monitored</small>
           </div>
 
           <div className="stat-card">
@@ -113,41 +129,47 @@ function App() {
               <button>View all</button>
             </div>
 
-            {incidents.map((incident) => (
-              <div
-                key={incident.id}
-                className="incident clickable"
-                onClick={() => setSelectedIncident(incident)}
-              >
+            {loading ? (
+              <p className="loading-text">Loading incidents...</p>
+            ) : incidents.length === 0 ? (
+              <p className="loading-text">No active incidents.</p>
+            ) : (
+              incidents.map((incident) => (
                 <div
-                  className={`incident-indicator ${
-                    incident.severity === "HIGH"
-                      ? "high"
-                      : incident.severity === "MEDIUM"
-                      ? "medium"
-                      : "low"
-                  }`}
-                ></div>
-
-                <div className="incident-info">
-                  <h3>{incident.title}</h3>
-                  <p>{incident.service}</p>
-                  <span>{incident.time}</span>
-                </div>
-
-                <div
-                  className={`severity ${
-                    incident.severity === "HIGH"
-                      ? "high-text"
-                      : incident.severity === "MEDIUM"
-                      ? "medium-text"
-                      : "low-text"
-                  }`}
+                  key={incident.id}
+                  className="incident clickable"
+                  onClick={() => setSelectedIncident(incident)}
                 >
-                  {incident.severity}
+                  <div
+                    className={`incident-indicator ${
+                      incident.severity === "HIGH"
+                        ? "high"
+                        : incident.severity === "MEDIUM"
+                        ? "medium"
+                        : "low"
+                    }`}
+                  ></div>
+
+                  <div className="incident-info">
+                    <h3>{incident.title}</h3>
+                    <p>{incident.service}</p>
+                    <span>{incident.time}</span>
+                  </div>
+
+                  <div
+                    className={`severity ${
+                      incident.severity === "HIGH"
+                        ? "high-text"
+                        : incident.severity === "MEDIUM"
+                        ? "medium-text"
+                        : "low-text"
+                    }`}
+                  >
+                    {incident.severity}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="panel assistant-panel">
@@ -155,22 +177,92 @@ function App() {
 
             <h2>OpsEcho Assistant</h2>
 
-            <div className="voice-circle">
-              <div className="mic">●</div>
+            <div
+              className={`voice-circle ${
+                voiceState !== "idle" ? "voice-active" : ""
+              }`}
+            >
+              <div className="mic">
+                {voiceState === "idle" && "●"}
+                {voiceState === "listening" && "◉"}
+                {voiceState === "processing" && "⋯"}
+                {voiceState === "result" && "✓"}
+              </div>
             </div>
 
-            <p className="assistant-text">
-              Ask OpsEcho to investigate an incident, analyze logs, or check
-              your infrastructure.
-            </p>
+            {voiceState === "idle" && (
+              <>
+                <p className="assistant-text">
+                  Ask OpsEcho to investigate an incident, analyze logs, or
+                  check your infrastructure.
+                </p>
 
-            <button className="voice-button">
-              Start Voice Session
-            </button>
+                <button
+                  className="voice-button"
+                  onClick={startVoiceSession}
+                >
+                  Start Voice Session
+                </button>
 
-            <p className="example">
-              Try: "What caused the 500 errors?"
-            </p>
+                <p className="example">
+                  Try: "What caused the 500 errors?"
+                </p>
+              </>
+            )}
+
+            {voiceState === "listening" && (
+              <>
+                <h3 className="voice-state-title">Listening...</h3>
+
+                <p className="assistant-text">
+                  I'm listening for your incident query.
+                </p>
+
+                <div className="voice-query">
+                  "What caused the 500 errors?"
+                </div>
+              </>
+            )}
+
+            {voiceState === "processing" && (
+              <>
+                <h3 className="voice-state-title">
+                  Analyzing incident...
+                </h3>
+
+                <p className="assistant-text">
+                  OpsEcho is checking the latest infrastructure data.
+                </p>
+
+                <div className="processing-bar">
+                  <div></div>
+                </div>
+              </>
+            )}
+
+            {voiceState === "result" && (
+              <>
+                <h3 className="voice-state-title">
+                  Incident identified
+                </h3>
+
+                <p className="assistant-text">
+                  I found a likely database connectivity issue behind the
+                  HTTP 500 spike.
+                </p>
+
+                <button
+                  className="voice-button"
+                  onClick={openVoiceIncident}
+                >
+                  View Diagnosis
+                </button>
+
+                <p className="example">
+                  Opening incident investigation...
+                </p>
+              </>
+            )}
           </div>
         </section>
 
@@ -211,9 +303,36 @@ function App() {
   );
 }
 
-
 function IncidentDetails({ incident, onBack }) {
   const [remediated, setRemediated] = useState(false);
+  const [diagnosis, setDiagnosis] = useState(null);
+  const [investigating, setInvestigating] = useState(true);
+
+  useEffect(() => {
+    loadDiagnosis();
+  }, []);
+
+  async function loadDiagnosis() {
+    const result = await investigateIncident(incident.id);
+
+    setDiagnosis(result);
+    setInvestigating(false);
+  }
+
+  async function handleRemediation() {
+    const result = await confirmRemediation(incident.id);
+
+    if (result.success) {
+      setRemediated(true);
+    }
+  }
+
+  const severityClass =
+    incident.severity === "HIGH"
+      ? "high-text"
+      : incident.severity === "MEDIUM"
+      ? "medium-text"
+      : "low-text";
 
   return (
     <div className="app">
@@ -254,7 +373,7 @@ function IncidentDetails({ incident, onBack }) {
             <h1>{incident.title}</h1>
 
             <p className="incident-subtitle">
-              {incident.service} · Detected 4 minutes ago
+              {incident.service} · {incident.time}
             </p>
           </div>
 
@@ -267,12 +386,16 @@ function IncidentDetails({ incident, onBack }) {
         <section className="incident-summary">
           <div className="summary-card">
             <span>Severity</span>
-            <strong className="high-text">{incident.severity}</strong>
+            <strong className={severityClass}>
+              {incident.severity}
+            </strong>
           </div>
 
           <div className="summary-card">
             <span>Status</span>
-            <strong>{remediated ? "RESOLVED" : "INVESTIGATING"}</strong>
+            <strong>
+              {remediated ? "RESOLVED" : "INVESTIGATING"}
+            </strong>
           </div>
 
           <div className="summary-card">
@@ -282,7 +405,9 @@ function IncidentDetails({ incident, onBack }) {
 
           <div className="summary-card">
             <span>Detected</span>
-            <strong>4 min ago</strong>
+            <strong>
+              {incident.time.replace("Detected ", "")}
+            </strong>
           </div>
         </section>
 
@@ -294,9 +419,7 @@ function IncidentDetails({ incident, onBack }) {
                 <h2>Recent Logs</h2>
               </div>
 
-              <span className="live-label">
-                LIVE
-              </span>
+              <span className="live-label">LIVE</span>
             </div>
 
             <div className="logs">
@@ -343,58 +466,69 @@ function IncidentDetails({ incident, onBack }) {
 
             <h2>OpsEcho Diagnosis</h2>
 
-            <div className="diagnosis-box">
-              <div className="diagnosis-icon">AI</div>
-
-              <div>
-                <strong>Likely database connectivity issue</strong>
-
-                <p>
-                  Multiple database connection timeouts and an exhausted
-                  connection pool were detected in the latest logs.
-                </p>
+            {investigating ? (
+              <div className="diagnosis-loading">
+                Analyzing incident data...
               </div>
-            </div>
-
-            <div className="confidence">
-              <div>
-                <span>Diagnosis confidence</span>
-                <strong>91%</strong>
-              </div>
-
-              <div className="confidence-bar">
-                <div></div>
-              </div>
-            </div>
-
-            <div className="recommendation">
-              <p className="eyebrow">RECOMMENDED ACTION</p>
-
-              <h3>Restart affected service</h3>
-
-              <p>
-                Restart the production-api service after confirming that the
-                database is reachable.
-              </p>
-            </div>
-
-            {!remediated ? (
-              <button
-                className="remediation-button"
-                onClick={() => setRemediated(true)}
-              >
-                Confirm Remediation
-              </button>
             ) : (
-              <div className="resolved-message">
-                ✓ Remediation confirmed successfully
-              </div>
-            )}
+              <>
+                <div className="diagnosis-box">
+                  <div className="diagnosis-icon">AI</div>
 
-            <p className="safety-note">
-              OpsEcho requires confirmation before performing infrastructure
-              actions.
-            </p>
+                  <div>
+                    <strong>{diagnosis.diagnosis}</strong>
+
+                    <p>{diagnosis.explanation}</p>
+                  </div>
+                </div>
+
+                <div className="confidence">
+                  <div>
+                    <span>Diagnosis confidence</span>
+                    <strong>{diagnosis.confidence}%</strong>
+                  </div>
+
+                  <div className="confidence-bar">
+                    <div
+                      style={{
+                        width: `${diagnosis.confidence}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="recommendation">
+                  <p className="eyebrow">
+                    RECOMMENDED ACTION
+                  </p>
+
+                  <h3>{diagnosis.recommendedAction}</h3>
+
+                  <p>
+                    Restart the affected service after confirming
+                    that the database is reachable.
+                  </p>
+                </div>
+
+                {!remediated ? (
+                  <button
+                    className="remediation-button"
+                    onClick={handleRemediation}
+                  >
+                    Confirm Remediation
+                  </button>
+                ) : (
+                  <div className="resolved-message">
+                    ✓ Remediation confirmed successfully
+                  </div>
+                )}
+
+                <p className="safety-note">
+                  OpsEcho requires confirmation before performing
+                  infrastructure actions.
+                </p>
+              </>
+            )}
           </div>
         </section>
 
@@ -422,7 +556,11 @@ function IncidentDetails({ incident, onBack }) {
 
             <TimelineItem
               time="Now"
-              title={remediated ? "Remediation completed" : "Awaiting confirmation"}
+              title={
+                remediated
+                  ? "Remediation completed"
+                  : "Awaiting confirmation"
+              }
               text={
                 remediated
                   ? "The recommended remediation has been confirmed."
@@ -435,7 +573,6 @@ function IncidentDetails({ incident, onBack }) {
     </div>
   );
 }
-
 
 function LogLine({ time, type, message }) {
   return (
@@ -455,7 +592,6 @@ function LogLine({ time, type, message }) {
   );
 }
 
-
 function TimelineItem({ time, title, text }) {
   return (
     <div className="timeline-item">
@@ -469,6 +605,5 @@ function TimelineItem({ time, title, text }) {
     </div>
   );
 }
-
 
 export default App;
